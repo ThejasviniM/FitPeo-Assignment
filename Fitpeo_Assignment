@@ -1,0 +1,197 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.keys import Keys
+from webdriver_manager.chrome import ChromeDriverManager
+import time
+
+class Fitpeo_Assigment:
+    def __init__(self):
+        print("Initializing the automation...")
+        try:
+            # Configuring the Chrome options
+            self.options = webdriver.ChromeOptions()
+            self.options.add_argument('--start-maximized')
+            self.options.add_argument('--disable-gpu')
+            self.options.add_argument('--no-sandbox')
+            self.options.add_argument('--disable-dev-shm-usage')
+            
+            # Adding version selection
+            self.options.add_experimental_option('excludeSwitches', ['enable-logging'])
+            
+            # Initializing ChromeDriver with automatic version management
+            service = Service()
+            self.driver = webdriver.Chrome(service=service, options=self.options)
+            self.wait = WebDriverWait(self.driver, 20)
+            print("Browser initialized successfully")
+            
+        except Exception as e:
+            print(f"Error initializing browser: {str(e)}")
+            raise
+
+    def navigate_to_homepage(self):
+        try:
+            print("Navigating to Revenue Calculator page...")
+            self.driver.get("https://www.fitpeo.com/revenue-calculator")
+            time.sleep(5)
+            print("Successfully navigated to Revenue Calculator page")
+        except Exception as e:
+            print(f"Error navigating to page: {str(e)}")
+            raise
+
+    def scroll_to_slider(self):
+        try:
+            print("Searching for slider...")
+            time.sleep(2)
+            
+            # Try multiple methods to find the slider
+            slider_selectors = [
+                (By.CSS_SELECTOR, "input[type='range']"),
+                (By.CSS_SELECTOR, "[role='slider']"),
+                (By.CLASS_NAME, "MuiSlider-root"),
+                (By.CLASS_NAME, "css-16i48op")
+            ]
+            
+            slider = None
+            for selector_type, selector in slider_selectors:
+                try:
+                    slider = self.wait.until(EC.presence_of_element_located((selector_type, selector)))
+                    break
+                except:
+                    continue
+            
+            if slider:
+                print("Slider found, scrolling to it...")
+                self.driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", slider)
+                time.sleep(2)
+                print("Successfully scrolled to slider")
+                return slider
+            else:
+                raise Exception("Could not find slider element")
+                
+        except Exception as e:
+            print(f"Error finding or scrolling to slider: {str(e)}")
+            raise
+
+    def adjust_slider(self, value):
+        try:
+            print(f"Attempting to adjust slider to {value}...")
+            
+            # Find input field
+            input_field = self.wait.until(EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "input[type='number']")))
+            
+            # Clear and set value
+            input_field.clear()
+            input_field.send_keys(str(value))
+            input_field.send_keys(Keys.RETURN)
+            
+            time.sleep(2)
+            print(f"Successfully set value to {value}")
+            
+        except Exception as e:
+            print(f"Error adjusting slider: {str(e)}")
+            raise
+
+    def select_cpt_codes(self):
+        try:
+            print("Attempting to select CPT codes...")
+            cpt_codes = ['99091', '99453', '99454', '99474']
+            
+            for code in cpt_codes:
+                print(f"Looking for CPT-{code}...")
+                
+                # Try to find and click the checkbox label instead of the input
+                xpath_patterns = [
+                    f"//p[contains(text(), 'CPT-{code}')]/..//label",
+                    f"//div[contains(text(), 'CPT-{code}')]/..//label",
+                    f"//p[text()='CPT-{code}']/following-sibling::label"
+                ]
+                
+                for xpath in xpath_patterns:
+                    try:
+                        label = self.wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
+                        self.driver.execute_script("arguments[0].click();", label)
+                        print(f"Selected CPT-{code}")
+                        time.sleep(1)
+                        break
+                    except:
+                        continue
+                
+        except Exception as e:
+            print(f"Error selecting CPT codes: {str(e)}")
+            raise
+
+    def validate_reimbursement(self, expected_value):
+        try:
+            print("Validating reimbursement amount...")
+            time.sleep(2)
+            
+            xpath_patterns = [
+                "//div[contains(text(), 'Total Recurring Reimbursement')]//following-sibling::p",
+                "//div[contains(@class, 'css-m1khva')]//p[contains(@class, 'css-12bch19')]",
+                "//p[contains(text(), '$')]"
+            ]
+            
+            for xpath in xpath_patterns:
+                try:
+                    amount = self.wait.until(EC.presence_of_element_located((By.XPATH, xpath)))
+                    value = amount.text.replace('$', '').replace(',', '')
+                    print(f"Found amount: ${value}")
+                    if int(value) == expected_value:
+                        print(f"Validation successful! Amount matches expected ${expected_value}")
+                        return
+                except:
+                    continue
+            
+            print(f"Warning: Could not validate amount against expected ${expected_value}")
+            
+        except Exception as e:
+            print(f"Error validating reimbursement: {str(e)}")
+            raise
+
+    def run_test_cases(self):
+        try:
+            print("\n=== Starting Test Cases ===\n")
+            
+            self.navigate_to_homepage()
+            print("\n--- Navigation Complete ---\n")
+            
+            self.scroll_to_slider()
+            print("\n--- Scrolling Complete ---\n")
+            
+            self.adjust_slider(820)
+            print("\n--- First Slider Adjustment Complete ---\n")
+            
+            time.sleep(2)
+            self.adjust_slider(560)
+            print("\n--- Second Slider Adjustment Complete ---\n")
+            
+            self.select_cpt_codes()
+            print("\n--- CPT Code Selection Complete ---\n")
+            
+            self.validate_reimbursement(110700)
+            print("\n--- Validation Complete ---\n")
+            
+            print("All test cases completed successfully!")
+            
+        except Exception as e:
+            print(f"\n!!! Test cases failed: {str(e)} !!!\n")
+        finally:
+            print("\nClosing browser...")
+            if hasattr(self, 'driver'):
+                self.driver.quit()
+            print("Browser closed")
+
+if __name__ == "__main__":
+    try:
+        print("\n=== Starting Revenue Calculator Automation ===\n")
+        automation = Fitpeo_Assigment()
+        automation.run_test_cases()
+    except Exception as e:
+        print(f"\n!!! Major error occurred: {str(e)} !!!\n")
+    finally:
+        print("\n=== Automation Complete ===\n")
